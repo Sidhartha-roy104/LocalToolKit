@@ -1,20 +1,43 @@
 """
-Temporary file / directory helpers.
+Temporary file / directory helpers and resource resolution.
 Each request gets its own UUID-named temp dir; it is deleted after the response.
 No filenames or file contents are ever logged.
 """
 from __future__ import annotations
-import os, re, shutil, uuid, logging
+import os, sys, re, shutil, uuid, logging
 from pathlib import Path
-from backend.config import TEMP_ROOT
 
 log = logging.getLogger(__name__)
 
 
+def resource_path(relative: str | Path = "") -> Path:
+    """
+    Get absolute path to resource, works for development and PyInstaller frozen app.
+    When frozen with PyInstaller, sys._MEIPASS points to the bundled files folder.
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base = Path(sys._MEIPASS)
+    elif getattr(sys, "frozen", False):
+        base = Path(sys.executable).resolve().parent
+    else:
+        # Development root (project directory)
+        base = Path(__file__).resolve().parent.parent.parent
+    
+    if relative:
+        return (base / relative).resolve()
+    return base.resolve()
+
+
+def get_temp_root() -> Path:
+    import tempfile
+    return Path(tempfile.gettempdir()) / "localtoolkit"
+
+
 def make_temp_dir() -> Path:
-    """Create a fresh, isolated temp directory for one request."""
-    TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-    d = TEMP_ROOT / uuid.uuid4().hex
+    """Create a fresh, isolated temp directory in the system temp directory."""
+    temp_root = get_temp_root()
+    temp_root.mkdir(parents=True, exist_ok=True)
+    d = temp_root / uuid.uuid4().hex
     d.mkdir()
     return d
 
@@ -29,12 +52,13 @@ def cleanup_temp_dir(path: Path) -> None:
 
 def sweep_old_temps() -> None:
     """Remove any leftover temp directories from previous runs (called at startup)."""
-    if not TEMP_ROOT.exists():
+    temp_root = get_temp_root()
+    if not temp_root.exists():
         return
-    for item in TEMP_ROOT.iterdir():
+    for item in temp_root.iterdir():
         if item.is_dir():
             shutil.rmtree(item, ignore_errors=True)
-    log.info("Swept leftover temp directories.")
+    log.info("Swept leftover temp directories from %s.", temp_root)
 
 
 _UNSAFE = re.compile(r"[^\w.\-]")

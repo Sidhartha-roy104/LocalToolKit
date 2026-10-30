@@ -5,10 +5,11 @@ No telemetry, no remote endpoints.
 """
 from pathlib import Path
 import tempfile, os
+from backend.utils.files import resource_path, get_temp_root
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
-TEMP_ROOT = Path(tempfile.gettempdir()) / "localtoolkit"
+BASE_DIR = resource_path()
+FRONTEND_DIR = resource_path("frontend")
+TEMP_ROOT = get_temp_root()
 
 # Server — bind to loopback only, never expose to network
 HOST = "127.0.0.1"

@@ -1,0 +1,100 @@
+/* ============================================================
+   tokens.css — Design System Tokens
+   All colours, spacing, radii, shadows, type scale as CSS vars.
+   Dark mode overrides via [data-theme="dark"].
+   ============================================================ */
+
+:root {
+  /* ── Brand ── */
+  --blue:        #2563EB;
+  --blue-hover:  #1D4ED8;
+  --blue-light:  #EFF6FF;
+  --blue-mid:    #BFDBFE;
+
+  /* ── Text ── */
+  --text:        #0F172A;
+  --text-2:      #1E293B;
+  --muted:       #64748B;
+  --muted-2:     #94A3B8;
+
+  /* ── Surface ── */
+  --bg:          #F8FAFC;
+  --bg-2:        #F1F5F9;
+  --card-bg:     #FFFFFF;
+  --nav-bg:      rgba(255,255,255,0.88);
+  --border:      #E2E8F0;
+  --border-2:    #CBD5E1;
+
+  /* ── Feedback ── */
+  --success:     #16A34A;
+  --success-bg:  #DCFCE7;
+  --error:       #DC2626;
+  --error-bg:    #FEE2E2;
+  --warn:        #D97706;
+  --warn-bg:     #FEF3C7;
+
+  /* ── Compact Spacing scale ── */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* ── Radii ── */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -2px rgba(0,0,0,.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.08), 0 10px 10px -5px rgba(0,0,0,.03);
+  --shadow-card-hover: 0 8px 20px -3px rgba(37,99,235,.16), 0 2px 6px rgba(0,0,0,.05);
+
+  /* ── Slim Nav & Footer heights ── */
+  --nav-height: 52px;
+  --footer-height: 36px;
+
+  /* ── Transitions ── */
+  --ease: cubic-bezier(.4,0,.2,1);
+  --dur-fast: 150ms;
+  --dur-norm: 200ms;
+  --dur-slow: 300ms;
+
+  /* ── Type ── */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+}
+
+/* ── Dark mode ─────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --text:       #F1F5F9;
+  --text-2:     #E2E8F0;
+  --muted:      #94A3B8;
+  --muted-2:    #64748B;
+
+  --bg:         #0F172A;
+  --bg-2:       #1E293B;
+  --card-bg:    #1E293B;
+  --nav-bg:     rgba(15,23,42,0.92);
+  --border:     #334155;
+  --border-2:   #475569;
+
+  --blue-light: #1E3A5F;
+  --blue-mid:   #1E40AF;
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-md:  0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -1px rgba(0,0,0,.3);
+  --shadow-lg:  0 10px 15px -3px rgba(0,0,0,.5), 0 4px 6px -2px rgba(0,0,0,.3);
+  --shadow-card-hover: 0 8px 20px -3px rgba(59,130,246,.25), 0 2px 6px rgba(0,0,0,.4);
+}

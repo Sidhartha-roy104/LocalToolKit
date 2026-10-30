@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+venv/
+.venv/
+env/
+ENV/
+
+# PyInstaller
+build/
+dist/
+*.spec
+!build.spec
+
+# Testing & cache
+.pytest_cache/
+
+# Logs & temporary files
+*.log
+tmp/
+dev_temp_chrome/
+
+# Environment files
+.env
+.env.local
+
+# Operating System files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Archives & development assets
+*.zip
+dev_screenshots/
+

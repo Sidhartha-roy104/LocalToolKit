@@ -1,0 +1,17 @@
+# Core Framework & Server
+fastapi>=0.110.0,<1.0.0
+uvicorn[standard]>=0.29.0,<1.0.0
+python-multipart>=0.0.9
+
+# PDF Processing
+pypdf>=5.0.0
+PyMuPDF>=1.24.0
+img2pdf>=0.5.0
+pdf2docx>=0.5.8
+
+# Image Processing
+Pillow>=10.2.0
+pillow-heif>=0.16.0
+
+# Packaging (for building standalone .exe)
+pyinstaller>=6.5.0
