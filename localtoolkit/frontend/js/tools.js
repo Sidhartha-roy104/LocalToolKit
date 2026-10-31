@@ -73,6 +73,11 @@ export const TOOLS = [
         ],
         default: 'medium',
       },
+      {
+        key: 'allow_rasterize', type: 'checkbox', label: 'Allow converting pages to images (text will no longer be selectable)',
+        default: false,
+        hint: 'Use if strict target KB is unreachable via lossless and image downsampling.',
+      },
     ],
     actionLabel: 'Compress PDF',
     outputName: 'compressed.pdf',
@@ -357,6 +362,10 @@ export const TOOLS = [
     endpoint: '/api/tools/pdf-sign',
     method: 'POST',
     multi: true,
+    dualSlots: {
+      slot1: { key: 'pdf_file', label: 'PDF Document', accept: '.pdf', hint: 'PDF to sign' },
+      slot2: { key: 'sig_file', label: 'Signature Image', accept: '.png,.jpg,.jpeg', hint: 'PNG/JPG transparent or white' },
+    },
     accept: '.pdf,.png,.jpg,.jpeg',
     options: [
       {
@@ -599,6 +608,10 @@ export const TOOLS = [
     endpoint: '/api/tools/combine-photo-signature',
     method: 'POST',
     multi: true,
+    dualSlots: {
+      slot1: { key: 'photo', label: 'Candidate Photo', accept: '.jpg,.jpeg,.png,.webp', hint: 'Passport size photo' },
+      slot2: { key: 'signature', label: 'Signature Image', accept: '.jpg,.jpeg,.png,.webp', hint: 'Signature on white paper' },
+    },
     accept: '.jpg,.jpeg,.png,.webp',
     options: [
       {

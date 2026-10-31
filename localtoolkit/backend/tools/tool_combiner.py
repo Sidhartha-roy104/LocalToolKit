@@ -1,5 +1,6 @@
 """Photo + Signature Combiner — stitch photo, signature, candidate name, and date into one image."""
 from __future__ import annotations
+from typing import Any
 import io
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
@@ -13,11 +14,11 @@ from backend.config import ACCEPTED_IMAGE_EXTENSIONS
 router = APIRouter(prefix="/api/tools", tags=["Extra Tools"])
 
 
-def _safe_int(val: any, default: int) -> int:
+def _safe_int(val: Any, default: int) -> int:
     try:
-        if val is None or val == "":
+        if val is None or str(val).strip() == "":
             return default
-        return int(val)
+        return int(float(val))
     except Exception:
         return default
 
@@ -28,15 +29,15 @@ async def combine_photo_signature(
     photo: UploadFile | None = File(None),
     signature: UploadFile | None = File(None),
     file: UploadFile | None = File(None),
-    files: list[UploadFile] = File(None),
+    files: list[UploadFile] | None = File(None),
     name_text: str = Form(""),
     date_text: str = Form(""),
-    target_width: any = Form(350),
-    target_height: any = Form(500),
+    target_width: Any = Form(350),
+    target_height: Any = Form(500),
     layout: str = Form("vertical"),
-    spacing: any = Form(10),
+    spacing: Any = Form(10),
     format: str = Form("jpg"),
-    quality: any = Form(85),
+    quality: Any = Form(85),
 ):
     """Combine photo and signature vertically with optional name/date strip."""
     tmp = make_temp_dir()

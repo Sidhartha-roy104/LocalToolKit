@@ -112,7 +112,15 @@ async def estimate_image_size(
     if not actual_file:
         raise HTTPException(400, "An image file is required.")
 
-    q_val = max(1, min(95, _safe_int(quality, 75)))
+    try:
+        raw_q = int(float(quality))
+        if raw_q < 1 or raw_q > 100:
+            raise HTTPException(400, "Quality must be between 1 and 100.")
+        q_val = min(95, raw_q)
+    except HTTPException:
+        raise
+    except Exception:
+        q_val = 75
     kb_val = max(0, _safe_int(target_kb, 0))
 
     try:
@@ -160,7 +168,15 @@ async def compress_image(
     if not all_files:
         raise HTTPException(400, "At least one image file is required.")
 
-    q_val = max(1, min(95, _safe_int(quality, 75)))
+    try:
+        raw_q = int(float(quality))
+        if raw_q < 1 or raw_q > 100:
+            raise HTTPException(400, "Quality must be between 1 and 100.")
+        q_val = min(95, raw_q)
+    except HTTPException:
+        raise
+    except Exception:
+        q_val = 75
     kb_val = max(0, _safe_int(target_kb, 0))
     mw_val = max(0, _safe_int(max_width, 0))
     mh_val = max(0, _safe_int(max_height, 0))
@@ -172,28 +188,34 @@ async def compress_image(
             ext = Path(f.filename or "img.jpg").suffix.lower()
             data = await validate_upload(f, ACCEPTED_IMAGE_EXTENSIONS)
 
+            is_reachable = True
             if kb_val > 0:
-                out_bytes, out_ext, _ = compress_to_target(data, ext, kb_val * 1024)
+                out_bytes, out_ext, is_reachable = compress_to_target(data, ext, kb_val * 1024)
             else:
                 out_bytes, out_ext = _compress_one(data, ext, q_val, mw_val, mh_val)
 
             stem = sanitize_filename(f.filename or "image").rsplit(".", 1)[0]
-            results.append((f"{stem}_compressed{out_ext}", out_bytes))
+            results.append((f"{stem}_compressed{out_ext}", out_bytes, is_reachable))
 
         if len(results) == 1:
-            name, out_bytes = results[0]
+            name, out_bytes, reached = results[0]
             ext = name.rsplit(".", 1)[-1].lower()
             mt = {"jpg": "image/jpeg", "webp": "image/webp", "png": "image/png"}.get(ext, "application/octet-stream")
+            headers = {"Content-Disposition": f'attachment; filename="{name}"'}
+            if kb_val > 0:
+                headers["X-Target-Reachable"] = "true" if reached else "false"
+                if not reached:
+                    headers["X-Warning"] = f"Target size {kb_val} KB could not be reached cleanly; smallest possible image is returned ({len(out_bytes)//1024} KB)."
             background_tasks.add_task(cleanup_temp_dir, tmp)
             return StreamingResponse(
                 io.BytesIO(out_bytes),
                 media_type=mt,
-                headers={"Content-Disposition": f'attachment; filename="{name}"'},
+                headers=headers,
             )
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for name, out_bytes in results:
+            for name, out_bytes, _ in results:
                 zf.writestr(name, out_bytes)
         buf.seek(0)
         background_tasks.add_task(cleanup_temp_dir, tmp)

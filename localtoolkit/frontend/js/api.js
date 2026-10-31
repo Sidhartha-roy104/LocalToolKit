@@ -55,10 +55,18 @@ export async function submitTool(endpoint, formData, onProgress) {
         const disp = xhr.getResponseHeader('Content-Disposition') || '';
         const match = disp.match(/filename="?([^";\n]+)"?/);
         const filename = match ? match[1] : 'download';
+        const rawReport = xhr.getResponseHeader('X-Compression-Report') || xhr.getResponseHeader('x-compression-report');
+        let compressionReport = null;
+        if (rawReport) {
+          try {
+            compressionReport = JSON.parse(decodeURIComponent(rawReport));
+          } catch {}
+        }
         resolve({
           blob: xhr.response,
           filename,
           resultSize: xhr.response.size,
+          compressionReport,
         });
       } else {
         // Try to parse JSON error
@@ -136,10 +144,12 @@ export async function pollJob(jobId, onProgress, intervalMs = 800) {
 /**
  * Preview API calls
  */
-export async function getPDFThumbnails(file, maxPages = 50) {
+export async function getPDFThumbnails(file, maxPages = 24, startPage = 1, dpi = 36) {
   const fd = new FormData();
   fd.append('file', file);
   fd.append('max_pages', String(maxPages));
+  fd.append('start_page', String(startPage));
+  fd.append('dpi', String(dpi));
   const res = await fetch(BASE + '/api/preview/pdf-thumbnails', { method: 'POST', body: fd });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

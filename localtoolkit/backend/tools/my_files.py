@@ -250,18 +250,20 @@ async def move_file(
     request: Request,
     from_folder: str = Form(""),
     to_folder: str = Form(""),
+    source_folder: str = Form(""),
+    target_folder: str = Form(""),
     filename: str = Form(""),
 ):
     """Move a file to another folder in My Files."""
-    ff = from_folder.strip()
-    tf = to_folder.strip()
+    ff = (from_folder or source_folder).strip()
+    tf = (to_folder or target_folder).strip()
     fn = filename.strip()
     if not (ff and tf and fn):
         try:
             body = await request.json()
             if isinstance(body, dict):
-                ff = ff or str(body.get("from_folder", "")).strip()
-                tf = tf or str(body.get("to_folder", "")).strip()
+                ff = ff or str(body.get("from_folder", "") or body.get("source_folder", "")).strip()
+                tf = tf or str(body.get("to_folder", "") or body.get("target_folder", "")).strip()
                 fn = fn or str(body.get("filename", "")).strip()
         except Exception:
             pass

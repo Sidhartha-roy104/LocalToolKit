@@ -93,19 +93,22 @@ export function makeDraggable(listEl, onReorder) {
 // ── Render file item ───────────────────────────────────────────────
 /**
  * Create a draggable file list item.
+ * Supports both (file, index, onRemove, showDrag) and (file, index, showDrag, onRemove).
  * @param {File} file
  * @param {number} index
- * @param {function} onRemove - called with index when × clicked
- * @param {boolean} showDrag
+ * @param {function|boolean} onRemove - called with index when × clicked
+ * @param {boolean|function} showDrag
  */
 export function createFileItem(file, index, onRemove, showDrag = true) {
-  const ext = file.name.split('.').pop().toUpperCase();
+  let removeCb = typeof onRemove === 'function' ? onRemove : (typeof showDrag === 'function' ? showDrag : (() => {}));
+  let canDrag = typeof showDrag === 'boolean' ? showDrag : (typeof onRemove === 'boolean' ? onRemove : true);
+
   const li = document.createElement('div');
   li.className = 'file-item';
-  li.setAttribute('draggable', showDrag ? 'true' : 'false');
+  li.setAttribute('draggable', canDrag ? 'true' : 'false');
   li.dataset.fileIndex = index;
   li.innerHTML = `
-    ${showDrag ? `<span class="file-item__drag" aria-hidden="true">
+    ${canDrag ? `<span class="file-item__drag" aria-hidden="true">
       <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
         <circle cx="9" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/>
         <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
@@ -129,7 +132,7 @@ export function createFileItem(file, index, onRemove, showDrag = true) {
   `;
   li.querySelector('.file-item__remove').addEventListener('click', (e) => {
     e.stopPropagation();
-    onRemove(index);
+    removeCb(index);
   });
   return li;
 }
@@ -153,4 +156,3 @@ export function announce(msg) {
   _announcer.textContent = '';
   requestAnimationFrame(() => { _announcer.textContent = msg; });
 }
-

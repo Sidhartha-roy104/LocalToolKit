@@ -2,7 +2,7 @@
 from __future__ import annotations
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
-from pypdf import PdfWriter, PdfReader
+import fitz
 from backend.utils.files import make_temp_dir, cleanup_temp_dir, safe_output_path
 from backend.utils.security import validate_upload
 from backend.config import ACCEPTED_PDF_EXTENSIONS
@@ -25,22 +25,17 @@ async def unlock_pdf(
     tmp = make_temp_dir()
     try:
         data = await validate_upload(actual_file, ACCEPTED_PDF_EXTENSIONS)
-        src = tmp / "input.pdf"
-        src.write_bytes(data)
-        reader = PdfReader(str(src))
-        if reader.is_encrypted:
-            success = reader.decrypt(password)
-            if not success:
+        doc = fitz.open(stream=data, filetype="pdf")
+        if doc.is_encrypted:
+            auth = doc.authenticate(password)
+            if not auth:
+                doc.close()
                 raise HTTPException(403, "Incorrect password — could not unlock PDF.")
-        writer = PdfWriter()
-        writer.append_pages_from_reader(reader)
-        # Write without encryption
         out_path = safe_output_path(tmp, "unlocked.pdf")
-        with open(out_path, "wb") as fh:
-            writer.write(fh)
+        doc.save(str(out_path), encryption=fitz.PDF_ENCRYPT_NONE)
+        doc.close()
         background_tasks.add_task(cleanup_temp_dir, tmp)
-        return FileResponse(str(out_path), media_type="application/pdf",
-                            filename="unlocked.pdf")
+        return FileResponse(str(out_path), media_type="application/pdf", filename="unlocked.pdf")
     except HTTPException:
         cleanup_temp_dir(tmp)
         raise

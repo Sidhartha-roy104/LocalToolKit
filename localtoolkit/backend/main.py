@@ -3,6 +3,7 @@ Binds to 127.0.0.1 only. Serves frontend as static files.
 """
 from __future__ import annotations
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -80,7 +81,7 @@ class SecurityHeadersAndTokenMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if path.startswith("/api/"):
             # Exempt docs, health, token endpoint, and pytest test suite
-            exempt = path in ("/api/docs", "/api/openapi.json", "/api/token", "/api/health") or "pytest" in sys.modules
+            exempt = path in ("/api/docs", "/api/openapi.json", "/api/token", "/api/health") or ("pytest" in sys.modules and os.getenv("LTK_ENFORCE_TOKEN_TEST") != "1")
             if not exempt:
                 token = request.headers.get("x-session-token") or request.query_params.get("token")
                 if token != LAUNCH_TOKEN:
@@ -188,9 +189,33 @@ def get_job(job_id: str):
     }
 
 
-# ── API Catch-All for Unknown /api/* Routes (Returns JSON 404) ─────────────────
+# ── API Catch-All for Unknown /api/* Routes (Returns JSON 404, or 405 on method mismatch) ──
+def _get_all_known_api_routes() -> dict[str, set[str]]:
+    routes_map: dict[str, set[str]] = {}
+    for r in app.routes:
+        if hasattr(r, "original_router"):
+            for sr in r.original_router.routes:
+                p = getattr(sr, "path", "")
+                m = getattr(sr, "methods", None)
+                if p and m:
+                    routes_map.setdefault(p, set()).update(m)
+        else:
+            p = getattr(r, "path", "")
+            m = getattr(r, "methods", None)
+            if p and m and not p.startswith("/api/{unknown_path"):
+                routes_map.setdefault(p, set()).update(m)
+    return routes_map
+
+
 @app.api_route("/api/{unknown_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"], include_in_schema=False)
 async def api_unknown_catch_all(unknown_path: str, request: Request):
+    full_path = f"/api/{unknown_path.rstrip('/')}"
+    routes_map = _get_all_known_api_routes()
+    # Check exact match or trailing slash variant
+    matching_methods = routes_map.get(full_path) or routes_map.get(full_path + "/")
+    if matching_methods:
+        if request.method not in matching_methods:
+            return JSONResponse(status_code=405, content={"detail": "Method not allowed"})
     return JSONResponse(status_code=404, content={"detail": "Not found"})
 
 

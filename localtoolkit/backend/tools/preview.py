@@ -38,28 +38,31 @@ def _safe_int(val: Any, default: int) -> int:
 async def preview_pdf_thumbnails(
     file: UploadFile | None = File(None),
     files: list[UploadFile] | None = File(None),
-    max_pages: Any = Form(50),
-    dpi: Any = Form(54),
+    start_page: Any = Form(1),
+    max_pages: Any = Form(24),
+    dpi: Any = Form(36),
 ):
-    """Render fast low-res JPEG thumbnails for PDF pages (default 54 DPI for quick transfer)."""
+    """Render fast low-res JPEG thumbnails for PDF pages (default 36 DPI, alpha=False)."""
     actual_file = file or (files[0] if files else None)
     if not actual_file:
         raise HTTPException(400, "A PDF file is required.")
 
-    lim = max(1, _safe_int(max_pages, 50))
-    res_dpi = max(36, min(150, _safe_int(dpi, 54)))
+    st_page = max(1, _safe_int(start_page, 1))
+    lim = max(1, min(100, _safe_int(max_pages, 24)))
+    res_dpi = max(24, min(100, _safe_int(dpi, 36)))
 
     try:
         data = await validate_upload(actual_file, ACCEPTED_PDF_EXTENSIONS)
         doc = fitz.open(stream=data, filetype="pdf")
         total_pages = len(doc)
-        limit = min(total_pages, lim)
+        start_idx = st_page - 1
+        end_idx = min(total_pages, start_idx + lim)
 
         thumbnails: list[dict] = []
-        for idx in range(limit):
+        for idx in range(start_idx, end_idx):
             page = doc[idx]
-            pix = page.get_pixmap(dpi=res_dpi)
-            b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=65)).decode("ascii")
+            pix = page.get_pixmap(dpi=res_dpi, alpha=False)
+            b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=50)).decode("ascii")
             thumbnails.append({
                 "page": idx + 1,
                 "width": pix.width,
@@ -71,6 +74,7 @@ async def preview_pdf_thumbnails(
 
         return {
             "total_pages": total_pages,
+            "start_page": st_page,
             "rendered_count": len(thumbnails),
             "thumbnails": thumbnails,
         }
@@ -126,8 +130,8 @@ async def preview_watermark(
         mat = fitz.Matrix(ang_val)
         tw.write_text(page, opacity=op_val, color=col, morph=(center, mat))
 
-        pix = page.get_pixmap(dpi=72)
-        b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=75)).decode("ascii")
+        pix = page.get_pixmap(dpi=72, alpha=False)
+        b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=65)).decode("ascii")
         doc.close()
 
         return {
@@ -187,8 +191,8 @@ async def preview_page_numbers(
 
         page.insert_text(pt, label, fontsize=fs_val, color=(0.2, 0.2, 0.2))
 
-        pix = page.get_pixmap(dpi=72)
-        b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=75)).decode("ascii")
+        pix = page.get_pixmap(dpi=72, alpha=False)
+        b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=65)).decode("ascii")
         doc.close()
 
         return {
@@ -234,8 +238,8 @@ async def preview_doc_page(
 
         doc = fitz.open(str(pdfs[0]))
         page = doc[0]
-        pix = page.get_pixmap(dpi=72)
-        b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=75)).decode("ascii")
+        pix = page.get_pixmap(dpi=72, alpha=False)
+        b64_data = base64.b64encode(pix.tobytes("jpeg", jpg_quality=65)).decode("ascii")
         doc.close()
 
         return {

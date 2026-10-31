@@ -634,6 +634,8 @@ function _renderToolPage(tool, activePreset = null) {
     return false;
   });
 
+  const hasDualSlots = Boolean(tool && tool.dualSlots && typeof tool.dualSlots === 'object' && tool.dualSlots.slot1 && tool.dualSlots.slot2);
+
   view.innerHTML = `
     <!-- Top breadcrumb bar -->
     <div class="tool-topbar">
@@ -661,9 +663,26 @@ function _renderToolPage(tool, activePreset = null) {
           </div>
         ` : ''}
 
+        ${hasDualSlots ? `
+        <!-- Dual Upload Slots -->
+        <div class="dual-slots-container" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div class="dropzone dropzone--slot" id="dropzone-slot1" role="region" aria-label="${tool.dualSlots.slot1.label}" tabindex="0" style="padding:16px 12px;border:2px dashed var(--border-2);border-radius:var(--r-md);text-align:center;cursor:pointer;background:var(--card-bg);transition:all var(--dur-fast);">
+            <input type="file" id="file-input-slot1" class="file-input" style="display:none;" accept="${tool.dualSlots.slot1.accept}" aria-label="Upload ${tool.dualSlots.slot1.label}">
+            <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:4px;letter-spacing:0.5px;">Slot 1: ${tool.dualSlots.slot1.label}</div>
+            <div class="dropzone__title" id="slot1-name" style="font-size:13px;font-weight:600;margin-bottom:2px;">Click or drop file</div>
+            <div class="dropzone__hint" style="font-size:11px;color:var(--text-muted);">${tool.dualSlots.slot1.hint}</div>
+          </div>
+          <div class="dropzone dropzone--slot" id="dropzone-slot2" role="region" aria-label="${tool.dualSlots.slot2.label}" tabindex="0" style="padding:16px 12px;border:2px dashed var(--border-2);border-radius:var(--r-md);text-align:center;cursor:pointer;background:var(--card-bg);transition:all var(--dur-fast);">
+            <input type="file" id="file-input-slot2" class="file-input" style="display:none;" accept="${tool.dualSlots.slot2.accept}" aria-label="Upload ${tool.dualSlots.slot2.label}">
+            <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:4px;letter-spacing:0.5px;">Slot 2: ${tool.dualSlots.slot2.label}</div>
+            <div class="dropzone__title" id="slot2-name" style="font-size:13px;font-weight:600;margin-bottom:2px;">Click or drop file</div>
+            <div class="dropzone__hint" style="font-size:11px;color:var(--text-muted);">${tool.dualSlots.slot2.hint}</div>
+          </div>
+        </div>
+        ` : `
         <!-- Dropzone -->
         <div class="dropzone dropzone--compact" id="dropzone" role="region" aria-label="File drop area" tabindex="0">
-          <input type="file" id="file-input" class="file-input"
+          <input type="file" id="file-input" class="file-input" style="display:none;"
             ${tool.multi ? 'multiple' : ''}
             accept="${tool.accept || '*/*'}"
             aria-label="Choose file"
@@ -672,6 +691,7 @@ function _renderToolPage(tool, activePreset = null) {
           <div class="dropzone__title">${tool.multi ? 'Drop files here or click to browse' : 'Drop a file here or click to browse'}</div>
           <div class="dropzone__hint">${tool.accept ? tool.accept.split(',').join(' · ') : 'Any supported file'} (up to 200 MB)</div>
         </div>
+        ` }
 
         <!-- File queue list -->
         <div class="file-list" id="file-list" role="list"></div>
@@ -916,39 +936,104 @@ function _renderToolPage(tool, activePreset = null) {
     }, 350);
   }
 
-  optionsView?.addEventListener('input', () => {
-    toolPreview && toolPreview.update(tool, _files, _getFormOptions());
+  optionsView?.addEventListener('input', (e) => {
+    if (e.target && (e.target.name === 'pages' || e.target.name === 'ranges')) {
+      toolPreview && toolPreview.syncFromInput && toolPreview.syncFromInput(tool.id, e.target.value);
+    } else {
+      toolPreview && toolPreview.update(tool, _files, _getFormOptions());
+    }
     _triggerEstimate();
   });
 
+  let _slot1File = null;
+  let _slot2File = null;
+
+  if (hasDualSlots) {
+    const dz1 = document.getElementById('dropzone-slot1');
+    const in1 = document.getElementById('file-input-slot1');
+    const name1 = document.getElementById('slot1-name');
+    const dz2 = document.getElementById('dropzone-slot2');
+    const in2 = document.getElementById('file-input-slot2');
+    const name2 = document.getElementById('slot2-name');
+
+    const bindSlot = (dz, input, nameEl, isSlot1) => {
+      if (!dz || !input) return;
+      dz.addEventListener('click', (e) => {
+        if (e.target !== input) input.click();
+      });
+      input.addEventListener('click', (e) => e.stopPropagation());
+      dz.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dz.classList.add('dropzone--over');
+      });
+      dz.addEventListener('dragleave', () => dz.classList.remove('dropzone--over'));
+      dz.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dz.classList.remove('dropzone--over');
+        if (e.dataTransfer.files?.length) setFile(e.dataTransfer.files[0]);
+      });
+      input.addEventListener('change', () => {
+        if (input.files?.length) {
+          setFile(input.files[0]);
+          input.value = '';
+        }
+      });
+      const setFile = (f) => {
+        if (isSlot1) {
+          _slot1File = f;
+        } else {
+          _slot2File = f;
+        }
+        if (nameEl) nameEl.textContent = '✓ ' + f.name;
+        dz.style.borderColor = 'var(--accent, #10B981)';
+        dz.style.background = 'rgba(16, 185, 129, 0.08)';
+        _files = [_slot1File, _slot2File].filter(Boolean);
+        toolPreview && toolPreview.update(tool, _files, _getFormOptions());
+        _triggerEstimate();
+      };
+    };
+
+    bindSlot(dz1, in1, name1, true);
+    bindSlot(dz2, in2, name2, false);
+  }
+
   // Drag & drop handlers
-  dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropzone.classList.add('dropzone--over');
-  });
-  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dropzone--over'));
-  dropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropzone.classList.remove('dropzone--over');
-    if (e.dataTransfer.files?.length) {
-      _addFiles(Array.from(e.dataTransfer.files));
-    }
-  });
-
-  dropzone.addEventListener('click', () => fileInput.click());
-  dropzone.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('dragover', (e) => {
       e.preventDefault();
-      fileInput.click();
-    }
-  });
+      dropzone.classList.add('dropzone--over');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dropzone--over'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dropzone--over');
+      if (e.dataTransfer.files?.length) {
+        _addFiles(Array.from(e.dataTransfer.files));
+      }
+    });
 
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files?.length) {
-      _addFiles(Array.from(fileInput.files));
-      fileInput.value = '';
-    }
-  });
+    dropzone.addEventListener('click', (e) => {
+      if (e.target !== fileInput) {
+        fileInput.click();
+      }
+    });
+    fileInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.length) {
+        _addFiles(Array.from(fileInput.files));
+        fileInput.value = '';
+      }
+    });
+  }
 
   function _addFiles(incoming) {
     if (tool.multi) {
@@ -965,7 +1050,7 @@ function _renderToolPage(tool, activePreset = null) {
   function _renderFileList() {
     fileList.innerHTML = '';
     _files.forEach((file, index) => {
-      const item = createFileItem(file, index, _files.length > 1, _removeFile);
+      const item = createFileItem(file, index, _removeFile, _files.length > 1);
       fileList.appendChild(item);
     });
 
@@ -975,6 +1060,7 @@ function _renderToolPage(tool, activePreset = null) {
   }
 
   function _updateDropzoneState() {
+    if (!dropzone) return;
     if (_files.length > 0 && !tool.multi) {
       dropzone.classList.add('dropzone--has-file');
     } else {
@@ -1016,7 +1102,16 @@ function _renderToolPage(tool, activePreset = null) {
     }
 
     const formData = new FormData();
-    if (tool.multi) {
+    if (hasDualSlots) {
+      if (!_slot1File || !_slot2File) {
+        toast('info', 'Both files required', `Please upload both ${tool.dualSlots.slot1.label} and ${tool.dualSlots.slot2.label}.`);
+        return;
+      }
+      formData.append(tool.dualSlots.slot1.key, _slot1File);
+      formData.append(tool.dualSlots.slot2.key, _slot2File);
+      formData.append('files', _slot1File);
+      formData.append('files', _slot2File);
+    } else if (tool.multi) {
       _files.forEach(f => formData.append('files', f));
     } else {
       formData.append('file', _files[0]);
@@ -1037,6 +1132,22 @@ function _renderToolPage(tool, activePreset = null) {
     const opts = _getFormOptions();
     for (const [k, v] of Object.entries(opts)) {
       formData.append(k, v);
+    }
+
+    // For rotate-pdf, include visualizer per-page rotations
+    if (tool.id === 'rotate-pdf' && toolPreview && toolPreview.getPageRotations) {
+      const pageRots = toolPreview.getPageRotations();
+      if (pageRots && Object.keys(pageRots).length > 0) {
+        formData.set('page_rotations', JSON.stringify(pageRots));
+      }
+    }
+
+    // For remove-pages and extract-pages, ensure exact input value is sent
+    if (tool.id === 'remove-pages' || tool.id === 'extract-pages') {
+      const pInput = document.querySelector('input[name="pages"]');
+      if (pInput) {
+        formData.set('pages', pInput.value.trim());
+      }
     }
 
     processBtn.setAttribute('disabled', 'true');
@@ -1073,7 +1184,69 @@ function _renderToolPage(tool, activePreset = null) {
       actionSection.style.display = 'none';
       resultPanel.classList.add('active');
 
-      if (tool.showSizeDiff && originalSize > 0) {
+      if (result.compressionReport) {
+        const cr = result.compressionReport;
+        const reachedBadge = cr.reached
+          ? `<span style="background:var(--success-bg,#D1FAE5);color:var(--success-text,#065F46);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:8px;">Target Met</span>`
+          : (cr.target_size > 0 ? `<span style="background:var(--warn-bg,#FEF3C7);color:var(--warn-text,#92400E);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:8px;">Closest: ${fmtSize(cr.closest_reached)}</span>` : '');
+
+        let stepsHtml = '';
+        if (cr.steps_saved) {
+          const s1 = cr.steps_saved.lossless_cleanup || 0;
+          const s2 = cr.steps_saved.image_compression || 0;
+          const s3 = cr.steps_saved.rasterization || 0;
+          stepsHtml = `
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5;">
+              <div>• Lossless cleanup saved: <strong>${fmtSize(s1)}</strong></div>
+              <div>• Image downsampling saved: <strong>${fmtSize(s2)}</strong></div>
+              ${s3 > 0 ? `<div>• Rasterization saved: <strong>${fmtSize(s3)}</strong></div>` : ''}
+            </div>
+          `;
+        }
+
+        let breakdownHtml = '';
+        if (cr.breakdown) {
+          breakdownHtml = `
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+              Document breakdown: Images ${fmtSize(cr.breakdown.images || 0)} · Fonts ${fmtSize(cr.breakdown.fonts || 0)} · Other ${fmtSize(cr.breakdown.other || 0)}
+            </div>
+          `;
+        }
+
+        let retryRasterizeBtn = '';
+        if (!cr.reached && cr.rasterize_needed) {
+          retryRasterizeBtn = `
+            <div style="margin-top:10px;padding:8px 12px;background:var(--card-bg);border:1px solid var(--border-1);border-radius:var(--r-sm);">
+              <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text);">Target size not reached via image downsampling.</div>
+              <button type="button" class="btn btn--sm btn--secondary" id="retry-rasterize-btn" style="width:100%;">
+                Retry with Page Rasterization
+              </button>
+            </div>
+          `;
+        }
+
+        const saved = Math.max(0, originalSize - result.resultSize);
+        const pct = Math.round((saved / originalSize) * 100);
+
+        resultStats.innerHTML = `
+          <div style="margin-bottom:4px;">
+            <strong>${fmtSize(originalSize)} → ${fmtSize(result.resultSize)}</strong> (Saved ${pct}%)
+            ${reachedBadge}
+          </div>
+          ${breakdownHtml}
+          ${stepsHtml}
+          ${retryRasterizeBtn}
+        `;
+
+        const retryBtn = document.getElementById('retry-rasterize-btn');
+        if (retryBtn) {
+          retryBtn.addEventListener('click', () => {
+            const cb = document.querySelector('input[name="allow_rasterize"]');
+            if (cb) cb.checked = true;
+            _process();
+          });
+        }
+      } else if (tool.showSizeDiff && originalSize > 0) {
         const saved = Math.max(0, originalSize - result.resultSize);
         const pct = Math.round((saved / originalSize) * 100);
         resultStats.innerHTML = pct > 0
@@ -1120,6 +1293,18 @@ function _renderToolPage(tool, activePreset = null) {
     if (toolPreview) toolPreview.reset();
     _files = [];
     _resultBlob = null;
+    if (hasDualSlots) {
+      _slot1File = null;
+      _slot2File = null;
+      const n1 = document.getElementById('slot1-name');
+      const dz1 = document.getElementById('dropzone-slot1');
+      const n2 = document.getElementById('slot2-name');
+      const dz2 = document.getElementById('dropzone-slot2');
+      if (n1) n1.textContent = 'Click or drop file';
+      if (dz1) { dz1.style.borderColor = ''; dz1.style.background = ''; }
+      if (n2) n2.textContent = 'Click or drop file';
+      if (dz2) { dz2.style.borderColor = ''; dz2.style.background = ''; }
+    }
     fileList.innerHTML = '';
     _updateDropzoneState();
     optionsView.style.display = '';
