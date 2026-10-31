@@ -1,20 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller specification for LocalToolkit (--onedir mode).
-Packages FastAPI, Uvicorn, frontend assets, and local tool dependencies
+Packages FastAPI, Uvicorn, frontend assets, data files, and local tool dependencies
 into a standalone directory (dist/LocalToolkit/).
 """
 import os, sys
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 block_cipher = None
 
 root_dir = os.path.abspath(SPECPATH)
 
-# Data files: bundle the whole frontend/ folder
+# Data files: bundle the whole frontend folder and data JSONs
 datas = [
     (os.path.join(root_dir, 'frontend'), 'frontend'),
+    (os.path.join(root_dir, 'backend', 'data'), 'backend/data'),
+    (os.path.join(root_dir, 'frontend', 'data'), 'frontend/data'),
 ]
 binaries = []
 
@@ -43,7 +45,13 @@ hiddenimports = [
     'PIL.JpegImagePlugin',
     'PIL.PngImagePlugin',
     'PIL.BmpImagePlugin',
+    'secrets',
+    'starlette.middleware.base',
 ]
+
+# Ensure every tool module inside backend and backend.tools is bundled
+hiddenimports += collect_submodules('backend')
+hiddenimports += collect_submodules('backend.tools')
 
 # Collect all data, binaries, and submodules for heavy packages
 for pkg in ['pillow_heif', 'pdf2docx', 'pikepdf', 'fitz', 'pymupdf']:

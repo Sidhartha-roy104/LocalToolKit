@@ -4,12 +4,16 @@ All settings are read from environment variables with sensible defaults.
 No telemetry, no remote endpoints.
 """
 from pathlib import Path
-import tempfile, os
-from backend.utils.files import resource_path, get_temp_root
+import tempfile, os, secrets
+from backend.utils.files import resource_path, get_temp_root, get_app_data_dir
 
 BASE_DIR = resource_path()
 FRONTEND_DIR = resource_path("frontend")
 TEMP_ROOT = get_temp_root()
+APP_DATA_DIR = get_app_data_dir()
+
+# Random per-launch session token for API protection
+LAUNCH_TOKEN = secrets.token_hex(16)
 
 # Server — bind to loopback only, never expose to network
 HOST = "127.0.0.1"

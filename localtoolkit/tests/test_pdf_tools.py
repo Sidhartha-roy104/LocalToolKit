@@ -126,3 +126,53 @@ def test_wrong_type_rejected(client, pdf_bytes):
     )
     assert r.status_code == 415
 
+
+def test_compress_no_image_corruption_or_black_blocks(client):
+    """Regression test: verify compressed PDF does not render black blocks where transparent/masked images are."""
+    import fitz
+    from PIL import Image
+
+    doc = fitz.open()
+    page = doc.new_page(width=300, height=300)
+
+    # RGBA image with red circle and transparent background
+    rgba = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    for x in range(100):
+        for y in range(100):
+            if (x - 50) ** 2 + (y - 50) ** 2 <= 35 ** 2:
+                rgba.putpixel((x, y), (255, 30, 30, 255))
+    buf = io.BytesIO()
+    rgba.save(buf, format="PNG")
+
+    page.insert_image(fitz.Rect(50, 50, 150, 150), stream=buf.getvalue())
+    pdf_in = doc.tobytes()
+    doc.close()
+
+    r = client.post(
+        "/api/pdf/compress",
+        files=[("file", ("smask_doc.pdf", pdf_in, "application/pdf"))],
+        data={"quality": "low"},
+    )
+    assert r.status_code == 200
+
+    out_doc = fitz.open(stream=r.content, filetype="pdf")
+    pix = out_doc[0].get_pixmap()
+
+    # Sample the center of the red circle (should be red/white, NEVER black)
+    center_pixel = pix.pixel(100, 100)
+    assert center_pixel[0] > 180, f"Expected red channel > 180, got {center_pixel}"
+    assert center_pixel[1] < 100 and center_pixel[2] < 100, f"Expected non-black red pixel, got {center_pixel}"
+
+    # Verify background around circle is white, not black
+    corner_pixel = pix.pixel(60, 60)
+    assert corner_pixel[0] > 200 and corner_pixel[1] > 200 and corner_pixel[2] > 200, f"Expected white background, got {corner_pixel}"
+
+    # Count dark pixels in the 100x100 image area: must not be mostly black
+    dark_pixels = sum(
+        1 for x in range(50, 150) for y in range(50, 150)
+        if pix.pixel(x, y)[0] < 40 and pix.pixel(x, y)[1] < 40 and pix.pixel(x, y)[2] < 40
+    )
+    assert dark_pixels < 100, f"Image rendered as black blocks! Dark pixels count: {dark_pixels}/10000"
+    out_doc.close()
+
+

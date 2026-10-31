@@ -4,7 +4,8 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Background
 from fastapi.responses import FileResponse, StreamingResponse
 from pypdf import PdfWriter, PdfReader
 from pathlib import Path
-import uuid, io, zipfile
+import io
+import zipfile
 from backend.utils.files import make_temp_dir, cleanup_temp_dir, safe_output_path
 from backend.utils.security import validate_upload
 from backend.config import ACCEPTED_PDF_EXTENSIONS
@@ -37,25 +38,33 @@ def _parse_ranges(spec: str, total: int) -> list[list[int]]:
 @router.post("/split")
 async def split_pdf(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
     ranges: str = Form(""),          # e.g. "1-3,5,7-9" — empty = one page each
+    pages: str = Form(""),
+    mode: str = Form(""),
 ):
     """Split a PDF by page ranges. Empty ranges = one file per page."""
+    actual_file = file or (files[0] if files else None)
+    if not actual_file:
+        raise HTTPException(400, "A PDF file is required to split.")
+
     tmp = make_temp_dir()
     try:
-        data = await validate_upload(file, ACCEPTED_PDF_EXTENSIONS)
+        data = await validate_upload(actual_file, ACCEPTED_PDF_EXTENSIONS)
         src = tmp / "input.pdf"
         src.write_bytes(data)
         reader = PdfReader(str(src))
         total = len(reader.pages)
 
-        if ranges.strip():
-            groups = _parse_ranges(ranges.strip(), total)
+        range_spec = ranges.strip() or pages.strip()
+        if range_spec:
+            groups = _parse_ranges(range_spec, total)
         else:
             groups = [[i] for i in range(total)]
 
         out_dir = tmp / "split"
-        out_dir.mkdir()
+        out_dir.mkdir(exist_ok=True)
         out_files: list[Path] = []
         for i, group in enumerate(groups, 1):
             writer = PdfWriter()
@@ -89,4 +98,3 @@ async def split_pdf(
     except Exception as exc:
         cleanup_temp_dir(tmp)
         raise HTTPException(500, f"Split failed: {exc}") from exc
-

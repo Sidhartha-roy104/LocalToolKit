@@ -33,6 +33,12 @@
     <!-- Home view -->
     <div id="home-view"></div>
 
+    <!-- My Files view -->
+    <div id="my-files-view" style="display:none" class="container" aria-label="My Files local storage"></div>
+
+    <!-- Settings view -->
+    <div id="settings-view" style="display:none" class="container" aria-label="Settings and Privacy"></div>
+
     <!-- Tool view (SPA, no reload) -->
     <div id="tool-view" style="display:none" aria-label="Tool workspace"></div>
   </main>
@@ -48,6 +54,7 @@
         100% Offline. Your files never leave this device.
       </div>
       <div class="footer__links">
+        <a href="#/my-files">My Files</a>
         <a href="#/privacy">Privacy</a>
         <a href="#/about">About</a>
         <a href="/api/docs" target="_blank" rel="noopener">API Docs</a>
@@ -63,4 +70,3 @@
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>
-

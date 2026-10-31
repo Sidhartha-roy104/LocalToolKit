@@ -1,29 +1,38 @@
 """PDF Merge — combine multiple PDFs into one."""
 from __future__ import annotations
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
 from typing import List
 import uuid
 from pathlib import Path
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from pypdf import PdfWriter, PdfReader
-from backend.utils.files import make_temp_dir, cleanup_temp_dir, sanitize_filename, safe_output_path
+from backend.utils.files import make_temp_dir, cleanup_temp_dir, safe_output_path
 from backend.utils.security import validate_upload
 from backend.config import ACCEPTED_PDF_EXTENSIONS
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF"])
 
+
 @router.post("/merge")
 async def merge_pdf(
     background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(...),
+    files: list[UploadFile] | None = File(None),
+    file: UploadFile | None = File(None),
 ):
     """Merge multiple PDF files into a single PDF (order preserved)."""
-    if len(files) < 2:
+    all_files = []
+    if files:
+        all_files.extend(files)
+    if file:
+        all_files.append(file)
+
+    if len(all_files) < 2:
         raise HTTPException(400, "Please upload at least 2 PDF files to merge.")
+
     tmp = make_temp_dir()
     try:
         writer = PdfWriter()
-        for f in files:
+        for f in all_files:
             data = await validate_upload(f, ACCEPTED_PDF_EXTENSIONS)
             src = tmp / f"{uuid.uuid4().hex}.pdf"
             src.write_bytes(data)
@@ -43,4 +52,3 @@ async def merge_pdf(
     except Exception as exc:
         cleanup_temp_dir(tmp)
         raise HTTPException(500, f"Merge failed: {exc}") from exc
-

@@ -9,18 +9,25 @@ from backend.config import ACCEPTED_PDF_EXTENSIONS
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF"])
 
+
 @router.post("/protect")
 async def protect_pdf(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    password: str = Form(...),
+    file: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
+    password: str = Form(""),
 ):
     """Encrypt a PDF with a user password (AES-128)."""
-    if not password.strip():
+    actual_file = file or (files[0] if files else None)
+    if not actual_file:
+        raise HTTPException(400, "A PDF file is required.")
+
+    if not password or not password.strip():
         raise HTTPException(400, "Password cannot be empty.")
+
     tmp = make_temp_dir()
     try:
-        data = await validate_upload(file, ACCEPTED_PDF_EXTENSIONS)
+        data = await validate_upload(actual_file, ACCEPTED_PDF_EXTENSIONS)
         src = tmp / "input.pdf"
         src.write_bytes(data)
         reader = PdfReader(str(src))
@@ -39,4 +46,3 @@ async def protect_pdf(
     except Exception as exc:
         cleanup_temp_dir(tmp)
         raise HTTPException(500, f"Protect failed: {exc}") from exc
-

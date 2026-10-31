@@ -33,6 +33,26 @@ def get_temp_root() -> Path:
     return Path(tempfile.gettempdir()) / "localtoolkit"
 
 
+def get_app_data_dir() -> Path:
+    """
+    Return user application data directory for settings, history, and custom presets.
+    Windows: %APPDATA%/LocalToolkit
+    macOS: ~/Library/Application Support/LocalToolkit
+    Linux: ~/.config/LocalToolkit (or $XDG_CONFIG_HOME/LocalToolkit)
+    """
+    if sys.platform == "win32":
+        app_data = os.environ.get("APPDATA")
+        base = Path(app_data) if app_data else (Path.home() / "AppData" / "Roaming")
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        base = Path(xdg) if xdg else (Path.home() / ".config")
+    d = (base / "LocalToolkit").resolve()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def make_temp_dir() -> Path:
     """Create a fresh, isolated temp directory in the system temp directory."""
     temp_root = get_temp_root()

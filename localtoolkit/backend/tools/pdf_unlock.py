@@ -9,16 +9,22 @@ from backend.config import ACCEPTED_PDF_EXTENSIONS
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF"])
 
+
 @router.post("/unlock")
 async def unlock_pdf(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
     password: str = Form(""),
 ):
     """Remove password from an encrypted PDF. Provide the current password."""
+    actual_file = file or (files[0] if files else None)
+    if not actual_file:
+        raise HTTPException(400, "A PDF file is required.")
+
     tmp = make_temp_dir()
     try:
-        data = await validate_upload(file, ACCEPTED_PDF_EXTENSIONS)
+        data = await validate_upload(actual_file, ACCEPTED_PDF_EXTENSIONS)
         src = tmp / "input.pdf"
         src.write_bytes(data)
         reader = PdfReader(str(src))
@@ -41,4 +47,3 @@ async def unlock_pdf(
     except Exception as exc:
         cleanup_temp_dir(tmp)
         raise HTTPException(500, f"Unlock failed: {exc}") from exc
-

@@ -9,23 +9,35 @@ from backend.config import ACCEPTED_PDF_EXTENSIONS
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF"])
 
+
 @router.post("/remove-pages")
+@router.post("/remove")
 async def remove_pages(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    pages: str = Form(...),  # e.g. "2,4,6-8"
+    file: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
+    pages: str = Form(""),  # e.g. "2,4,6-8"
+    page_numbers: str = Form(""),
 ):
     """Remove specific pages from a PDF."""
+    actual_file = file or (files[0] if files else None)
+    if not actual_file:
+        raise HTTPException(400, "A PDF file is required.")
+
+    spec = pages.strip() or page_numbers.strip()
+    if not spec:
+        raise HTTPException(400, "Please specify pages to remove.")
+
     tmp = make_temp_dir()
     try:
-        data = await validate_upload(file, ACCEPTED_PDF_EXTENSIONS)
+        data = await validate_upload(actual_file, ACCEPTED_PDF_EXTENSIONS)
         src = tmp / "input.pdf"
         src.write_bytes(data)
         reader = PdfReader(str(src))
         total = len(reader.pages)
 
         remove_set: set[int] = set()
-        for part in pages.split(","):
+        for part in spec.split(","):
             part = part.strip()
             if "-" in part:
                 a, b = part.split("-", 1)
@@ -53,4 +65,3 @@ async def remove_pages(
     except Exception as exc:
         cleanup_temp_dir(tmp)
         raise HTTPException(500, f"Remove pages failed: {exc}") from exc
-

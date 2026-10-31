@@ -13,18 +13,27 @@ pillow_heif.register_heif_opener()
 
 router = APIRouter(prefix="/api/image", tags=["Images"])
 
+
 @router.post("/to-pdf")
 async def images_to_pdf(
     background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(...),
+    files: list[UploadFile] | None = File(None),
+    file: UploadFile | None = File(None),
 ):
     """Combine one or more images into a single PDF (order preserved)."""
-    if not files:
+    all_files = []
+    if files:
+        all_files.extend(files)
+    if file:
+        all_files.append(file)
+
+    if not all_files:
         raise HTTPException(400, "Please upload at least one image.")
+
     tmp = make_temp_dir()
     try:
         jpeg_paths: list[str] = []
-        for i, f in enumerate(files):
+        for i, f in enumerate(all_files):
             data = await validate_upload(f, ACCEPTED_IMAGE_EXTENSIONS)
             img = Image.open(io.BytesIO(data))
             if img.mode != "RGB":
@@ -46,4 +55,3 @@ async def images_to_pdf(
     except Exception as exc:
         cleanup_temp_dir(tmp)
         raise HTTPException(500, f"Conversion failed: {exc}") from exc
-

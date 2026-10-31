@@ -1,8 +1,8 @@
 """Image Convert — convert between JPG, PNG, WEBP, HEIC, BMP formats."""
 from __future__ import annotations
+from typing import List
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from typing import List
 from PIL import Image
 import pillow_heif, io, zipfile
 from backend.utils.files import make_temp_dir, cleanup_temp_dir, sanitize_filename
@@ -21,21 +21,33 @@ _FMT_MAP = {
     "bmp":  ("BMP",   "image/bmp",    ".bmp"),
 }
 
+
 @router.post("/convert")
 async def convert_image(
     background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(...),
+    files: list[UploadFile] | None = File(None),
+    file: UploadFile | None = File(None),
     to_format: str = Form("jpg"),
 ):
     """Convert images to a target format."""
-    to_format = to_format.lower().strip(".")
-    if to_format not in _FMT_MAP:
-        raise HTTPException(400, f"Unsupported target format '{to_format}'. Use jpg, png, webp, or bmp.")
-    pil_fmt, mime, out_ext = _FMT_MAP[to_format]
+    all_files = []
+    if files:
+        all_files.extend(files)
+    if file:
+        all_files.append(file)
+
+    if not all_files:
+        raise HTTPException(400, "At least one image is required to convert.")
+
+    target_fmt = to_format.lower().strip(".")
+    if target_fmt not in _FMT_MAP:
+        target_fmt = "jpg"
+    pil_fmt, mime, out_ext = _FMT_MAP[target_fmt]
+
     tmp = make_temp_dir()
     try:
         results: list[tuple[str, bytes]] = []
-        for f in files:
+        for f in all_files:
             data = await validate_upload(f, ACCEPTED_IMAGE_EXTENSIONS)
             img = Image.open(io.BytesIO(data))
             if pil_fmt == "JPEG" and img.mode in ("RGBA", "P"):
@@ -47,7 +59,7 @@ async def convert_image(
             if pil_fmt in ("JPEG", "WEBP"):
                 save_kwargs["quality"] = 90
             img.save(out, format=pil_fmt, **save_kwargs)
-            stem = sanitize_filename(f.filename).rsplit(".", 1)[0]
+            stem = sanitize_filename(f.filename or "image").rsplit(".", 1)[0]
             results.append((f"{stem}{out_ext}", out.getvalue()))
 
         if len(results) == 1:
